@@ -184,3 +184,76 @@ def test_failure_in_the_very_first_round_raises(tiny_cones, monkeypatch):
 def test_non_finite_systems_are_rejected():
     with pytest.raises(np.linalg.LinAlgError, match="nicht endlich"):
         K.newton_step(np.array([np.nan]), np.eye(1))
+
+
+# ----------------------------------------------------------------------------- Rückmeldung „weit vom Pfad“ (siehe docs/planung/konvexe-optimierung-planung/PLAN-KERN-HAERTUNG.md)
+
+def _outlier_problem():
+    """Kegelprogramm zu min (x⁴ / min(x, y))² auf [0,1; 3]² (aus Stück 3: Epigraph-Übersetzung von square(quad_over_lin(square(x), minimum(x, y)))):
+    Variablen x, y, t1 ≥ x², t2 ≤ min(x, y), t3 ≥ t1²/t2, t4 ≥ t3²; Ziel t4. Optimum 1,0·10⁻⁶ bei x = y = 0,1. Der Start liegt weit darüber (Zielwert 487)."""
+    A = np.zeros((15, 6))
+    A[0, 0], A[1, 0], A[2, 1], A[3, 1] = -1.0, 1.0, -1.0, 1.0           # Kasten: x − 0,1 ≥ 0, 3 − x ≥ 0, y − 0,1 ≥ 0, 3 − y ≥ 0
+    A[4, 2] = A[5, 2] = -1.0                                       # t1 ≥ x²: (t1 + 1, t1 − 1, 2x) im Lorentz-Kegel
+    A[6, 0] = -2.0
+    A[7, 0], A[7, 3] = -1.0, 1.0                                   # t2 ≤ x, t2 ≤ y
+    A[8, 1], A[8, 3] = -1.0, 1.0
+    A[9, 3] = A[9, 4] = -1.0                                       # t3 ≥ t1²/t2: (t3 + t2, t3 − t2, 2 t1)
+    A[10, 3], A[10, 4] = 1.0, -1.0
+    A[11, 2] = -2.0
+    A[12, 5] = A[13, 5] = -1.0                                     # t4 ≥ t3²: (t4 + 1, t4 − 1, 2 t3)
+    A[14, 4] = -2.0
+    b = np.array([-0.1, 3.0, -0.1, 3.0, 1.0, -1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, -1.0, 0.0])
+    c = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 1.0])
+    cones = (("l", 1),) * 4 + (("q", 3),) + (("l", 1),) * 2 + (("q", 3), ("q", 3))
+    x0 = np.array([1.55, 1.55, 3.4025000000000003, 0.55, 22.049102272727275, 487.1629110331871])
+    return K.ConeProblem(c, A, b, cones, x0)
+
+
+def test_the_documented_outlier_is_reported_as_far_from_path():
+    """Ohne Absicherung braucht die gedämpfte Phase hunderte Schritte, die Zentrierungen enden nach 100 Schritten weit vom Pfad, und die gemeldete Lücke 1,7·10⁻¹⁰ gilt nicht (Wert 190,4 statt 1,0·10⁻⁶).
+    Das Feld far_from_path meldet es; der Kern bricht hier absichtlich nicht ab (veröffentlichte Läufe in Stück 2 und 4 zentrieren die ersten Runden ebenfalls nie und liefern richtige Werte)."""
+    prob = _outlier_problem()
+    assert K.barrier_parameter(prob.cones) == 12 and np.isfinite(K.barrier_value(prob.cones, prob.b - prob.A @ prob.x0))
+    res = K.solve_barrier(prob, tol=1e-9)
+    assert res.far_from_path and res.converged and res.gap_bound < 1e-9
+    assert res.value == pytest.approx(190.386, abs=0.01)                 # falsch: das Optimum ist 1,0e-6
+
+
+def test_a_start_scaled_to_the_objective_gives_the_right_value_and_no_flag():
+    prob = _outlier_problem()
+    nu = K.barrier_parameter(prob.cones)
+    res = K.solve_barrier(prob, tol=1e-9, t0=nu / max(1.0, abs(float(prob.c @ prob.x0))))
+    assert not res.far_from_path and res.converged
+    assert res.value == pytest.approx(1e-6, abs=2e-9) and res.value - 1e-6 <= res.gap_bound + 1e-12
+
+
+def test_far_from_path_is_false_for_the_mini_programs(tiny_cones):
+    for name, (prob, opt) in tiny_cones.items():
+        res = K.solve_barrier(prob, tol=1e-9)
+        assert not res.far_from_path and res.converged and res.value == pytest.approx(opt, abs=1e-8), name
+
+
+def test_center_keeps_its_signature_and_ok_does_not_mean_centered(tiny_cones):
+    """Dokumentiert, was `ok = True` heißt: nach erschöpften Schritten ist ok wahr, obwohl nicht zentriert wurde; die vierte Rückgabe von _center sagt, wie weit der Punkt stand."""
+    prob, _ = tiny_cones["soc"]
+    out = K.center(prob, prob.x0, 1e3, max_iter=1)
+    assert len(out) == 3 and out[2] is True and out[1] == 1
+    x, steps, ok, far = K._center(prob, prob.x0, 1e3, 1e-6, 1)
+    assert ok and steps == 1 and isinstance(far, bool)
+    assert K._center(prob, prob.x0, 1.0, 1e-6, 100)[2:] == (True, False)
+    out_problem = _outlier_problem()
+    assert K._center(out_problem, out_problem.x0, 1.0, 1e-6, 1)[2:] == (True, True)             # ein Schritt vom Start, Dekrement 4,8·10² > 1
+
+
+def test_a_negative_decrement_still_counts_as_centered_and_is_not_flagged(tiny_cones, monkeypatch):
+    """Bei sehr großem t ist das Dekrement durch Rundung nicht verlässlich (in 21 bis 41 % der veröffentlichten Läufe läge es am Ende über 1e-3, obwohl die Werte stimmen):
+    ein negatives Dekrement-Quadrat zählt weiter als „unter tol“ und setzt far_from_path nicht (siehe PLAN-KERN-HAERTUNG.md, Option K)."""
+    prob, _ = tiny_cones["lp"]
+    monkeypatch.setattr(K, "newton_step", lambda g, h: (np.zeros_like(g), -5.0))
+    x, steps, ok, far = K._center(prob, prob.x0, 10.0, 1e-6, 100)
+    assert (steps, ok, far) == (0, True, False)
+
+
+def test_the_result_class_accepts_the_old_seven_fields():
+    r = K.BarrierResult(np.zeros(1), 0.0, 1e-9, 3, 2, [], True)
+    assert r.far_from_path is False

@@ -53,6 +53,7 @@ Alle Zahlen stehen in `tests/test_claims.py`; Experimente laufen über feste Wol
 - **Ellipsen nur um den Ursprung und mit Spurkriterium.** Ein freier Mittelpunkt oder das Volumenziel (`log det`) ist kein reines SDP in dieser Form.
 - **Keine Dualität:** Die Lückenschranke kommt aus der Barriere, nicht aus einem dualen Kegelprogramm (Stück 4).
 - **Zeiten** in Experiment 3 sind auf dem jeweiligen Server gemessen und werden nur angezeigt, nicht getestet.
+- **`ok = True` und `converged = True` im Kern heißen nicht „zentriert“.** `center` gilt auch nach 100 erschöpften Schritten, bei negativem Dekrement-Quadrat und im Rundungsstopp als ok; die Schranke `ν/t` gilt streng nur für einen zentrierten Punkt, und bei großem t ist das Dekrement durch Rundung nicht verlässlich bestimmbar. Das Ergebnis des Kerns trägt seit der Härtung das Feld `far_from_path` für die gefährlichste Klasse (eine Zentrierung endete nach 100 Schritten weit vom Pfad, siehe `tests/test_kern.py`). In den 90 Läufen der sechs Formen auf den 15 Wolken meldet das Feld nie. Eine strengere Härtung wurde gemessen und verworfen, weil sie veröffentlichte Läufe der Stücke 2 und 4 abbrechen ließe, die richtige Werte liefern. Keine Zahl dieser README ändert sich.
 - **d = 2 im Hauptdiagramm;** in höheren Dimensionen laufen die Formen (getestet in d = 1 und 3), das Hauptdiagramm und die Experimente 3 und 4 sind aber auf die Ebene begrenzt.
 
 ## Verifikation
@@ -63,7 +64,7 @@ Alle Zahlen stehen in `tests/test_claims.py`; Experimente laufen über feste Wol
 - **Randfälle** (`tests/test_edge_cases.py`): ein Punkt, zwei Punkte, gleiche Punkte, kollineare Punkte, d = 1 und 3, Punkt im Ursprung, ungültige Eingaben mit Meldung, Start außerhalb des Kegels.
 - **Verdikte** (`tests/test_verdicts.py`): reine Funktionen; jede Zahl im Text an handgesetzten Zeilen. **Claims** (`tests/test_claims.py`): jede Zahl dieser README.
 - **Oberfläche:** AppTest-Rauchtest (jeder Button, jeder Regler an Minimum und Maximum), Experimente 2 und 4, PDF, jede Form, alle Regler zugleich, Presets, Permalink, Layout, Footer, Laufzeit-Importe.
-- **Umfang:** 123 Tests (2 davon, die cvxpy-Orakel, überspringen sich ohne cvxpy), rund 1,5 Minuten (2026-11-01, Windows).
+- **Umfang:** 129 Tests (2 davon, die cvxpy-Orakel, überspringen sich ohne cvxpy), rund 1,5 Minuten (2026-11-01, Windows).
 - **Nicht gelaufen:** kein Mutationstest (seit 2026-10-28 nicht mehr Teil des Ablaufs). cvxpy und scipy sind Gegenproben im dev-Satz; ohne sie überspringen sich die jeweiligen Tests.
 
 ## Dateistruktur

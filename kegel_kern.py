@@ -16,6 +16,7 @@ import numpy as np
 
 SQ2 = math.sqrt(2.0)
 MIN_TOL = 1e-13          # kleinere Lückenschranken sind in doppelter Genauigkeit sinnlos: nu / t läge unter der Rundung von c^T x
+FAR_FROM_PATH = 1.0      # halbes Dekrement-Quadrat, ab dem eine erschöpfte Zentrierung als „weit vom Pfad“ gilt (siehe BarrierResult.far_from_path)
 
 
 @dataclass(frozen=True, eq=False)
@@ -42,6 +43,8 @@ class BarrierResult:
     rounds: int
     history: list = field(default_factory=list)   # je äußere Runde (t, Newton-Schritte bisher, Lückenschranke nu/t, Zielwert)
     converged: bool = True                        # falsch, wenn die Rechengenauigkeit vor der geforderten Lücke endete (gap_bound ist trotzdem bewiesen)
+    far_from_path: bool = False                   # wahr, wenn irgendeine Zentrierung nach max_iter Schritten mit einem halben Dekrement-Quadrat über FAR_FROM_PATH endete: der Punkt stand dann weit vom
+                                                  # zentralen Pfad, die Lückenschranke nu / t gilt für ihn nicht (Beispiel: Wert 190,4 statt 1e-6 bei gemeldeter Lücke 1,7e-10). Falsch heißt nicht „zentriert“.
 
 
 # ----------------------------------------------------------------------------- Kegel: Größen und Zugehörigkeit
@@ -230,25 +233,39 @@ def backtrack(problem: ConeProblem, x: np.ndarray, dx: np.ndarray, t: float, dec
     return x, 0.0
 
 
-def center(problem: ConeProblem, x: np.ndarray, t: float, tol: float = 1e-6, max_iter: int = 100) -> tuple[np.ndarray, int, bool]:
-    """Zentrieren für festes t: Newton-Schritte bis das halbe Dekrement-Quadrat unter `tol` liegt. Gibt (x, Zahl der Schritte, ok) zurück.
-
-    Bei sehr großem t verhindert Rundung, die Toleranz zu erreichen; dann bricht das Zentrieren ab, sobald ein Schritt f_t kaum noch senkt (relativ 1e-13).
-    ok ist falsch, wenn die Hesse-Matrix numerisch singulär wurde: das Ergebnis dieser Runde gilt dann nicht als zentriert."""
+def _center(problem: ConeProblem, x: np.ndarray, t: float, tol: float, max_iter: int) -> tuple[np.ndarray, int, bool, bool]:
+    """Wie `center`, mit einem vierten Wert: ob die Zentrierung nach max_iter Schritten weit vom Pfad endete (halbes Dekrement-Quadrat über FAR_FROM_PATH)."""
     steps = 0
+    last = 0.0
     for _ in range(max_iter):
         grad, hess = newton_system(problem, x, t)
         try:
             dx, dec2 = newton_step(grad, hess)
         except np.linalg.LinAlgError:
-            return x, steps, False
+            return x, steps, False, False
         if dec2 / 2.0 <= tol:
             break
+        last = dec2 / 2.0
         x, gain = backtrack(problem, x, dx, t, dec2)
         steps += 1
         if gain <= 1e-13 * (1.0 + abs(t * float(problem.c @ x))):
             break
-    return x, steps, True
+    else:
+        return x, steps, True, last > FAR_FROM_PATH
+    return x, steps, True, False
+
+
+def center(problem: ConeProblem, x: np.ndarray, t: float, tol: float = 1e-6, max_iter: int = 100) -> tuple[np.ndarray, int, bool]:
+    """Zentrieren für festes t: Newton-Schritte bis das halbe Dekrement-Quadrat unter `tol` liegt. Gibt (x, Zahl der Schritte, ok) zurück.
+
+    **ok = True heißt nur: die Rechnung ist nicht zusammengebrochen. Es heißt nicht, dass x zentriert ist.** Auch diese Enden gelten als ok:
+      * max_iter Schritte erschöpft, ohne tol zu erreichen (x kann weit vom Pfad stehen: siehe BarrierResult.far_from_path);
+      * ein negatives Dekrement-Quadrat (die Hesse-Matrix ist numerisch nicht positiv definit; tritt bei sehr großem t auf) zählt als „unter tol“;
+      * der Rundungsstopp: bei sehr großem t verhindert Rundung, die Toleranz zu erreichen; dann bricht das Zentrieren ab, sobald ein Schritt f_t kaum noch senkt (relativ 1e-13).
+    Die Schranke nu / t gilt streng nur für einen zentrierten Punkt; bei t über etwa 1e10 ist das Dekrement durch Rundung nicht mehr verlässlich zu bestimmen.
+    ok ist falsch, wenn die Hesse-Matrix numerisch singulär wurde: das Ergebnis dieser Runde gilt dann nicht als zentriert."""
+    x, steps, ok, _ = _center(problem, x, t, tol, max_iter)
+    return x, steps, ok
 
 
 def initial_t(problem: ConeProblem) -> float:
@@ -261,25 +278,28 @@ def initial_t(problem: ConeProblem) -> float:
 def solve_barrier(problem: ConeProblem, tol: float = 1e-8, mu: float = 8.0, t0: float | None = None, max_newton: int = 800) -> BarrierResult:
     """Barrierenmethode: zentrieren, t mit mu multiplizieren, bis nu / t <= tol. Der Start `problem.x0` muss streng zulässig sein.
 
-    Ohne t0 wird `initial_t` benutzt. `tol` wird nach unten auf MIN_TOL begrenzt. Gezentrierte Punkte sind bis auf ein Dekrement-Quadrat von 2e-6 genau; das ändert die Lückenschranke nu / t nicht merklich."""
+    Ohne t0 wird `initial_t` benutzt. `tol` wird nach unten auf MIN_TOL begrenzt. Gezentrierte Punkte sind bis auf ein Dekrement-Quadrat von 2e-6 genau; das ändert die Lückenschranke nu / t nicht merklich.
+    Das Ergebnis meldet `far_from_path`, wenn eine Zentrierung weit vom Pfad endete; dann gilt gap_bound nicht (siehe `center` und BarrierResult). Ein zu großer Startwert von cᵀx0 gegenüber
+    dem Optimum lässt die gedämpfte Phase hunderte Schritte brauchen: t0 = nu / max(1, |cᵀx0|) ist dann der bessere Start."""
     s0 = problem.b - problem.A @ problem.x0
     if not math.isfinite(barrier_value(problem.cones, s0)):
         raise ValueError("Start nicht streng zulässig")
     tol = max(tol, MIN_TOL)
     nu = barrier_parameter(problem.cones)
     x, t, total, history = problem.x0.copy(), (initial_t(problem) if t0 is None else t0), 0, []
-    t_good, x_good = None, x
+    t_good, x_good, far = None, x, False
     while True:
-        x_new, steps, ok = center(problem, x, t)
+        x_new, steps, ok, far_round = _center(problem, x, t, 1e-6, 100)
         total += steps
+        far = far or far_round
         if not ok:                                       # Rechengenauigkeit erschöpft: die zuletzt zentrierte Runde ist das Ergebnis, ihre Lücke ist bewiesen
             if t_good is None:
                 raise np.linalg.LinAlgError("schon die erste Runde konnte nicht zentriert werden")
-            return BarrierResult(x_good, float(problem.c @ x_good), nu / t_good, total, len(history), history, False)
+            return BarrierResult(x_good, float(problem.c @ x_good), nu / t_good, total, len(history), history, False, far)
         x, t_good, x_good = x_new, t, x_new
         history.append((t, total, nu / t, float(problem.c @ x)))
         if nu / t <= tol or total > max_newton:
-            return BarrierResult(x, float(problem.c @ x), nu / t, total, len(history), history, nu / t <= tol)
+            return BarrierResult(x, float(problem.c @ x), nu / t, total, len(history), history, nu / t <= tol, far)
         t *= mu
 
 

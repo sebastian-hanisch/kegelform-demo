@@ -51,6 +51,7 @@ def test_every_planar_solve_converges_to_the_requested_gap_and_passes_both_check
     """README: alle 90 Läufe (6 Formen, 15 Wolken) erreichen die Lücke 1e-9 und bestehen die Rückumformung."""
     runs = [r for rs in planar_runs.values() for r in rs]
     assert len(runs) == 90 and all(r.result.converged for r in runs)
+    assert not any(r.result.far_from_path for r in runs)                 # README: der Kern meldet in diesen 90 Läufen nie „weit vom Pfad“
     assert max(r.result.gap_bound for r in runs) <= 1.0e-9 * 1.01
     assert all(not r.cone_problems and not r.original_problems for r in runs)
 
