@@ -11,7 +11,7 @@ from kgf_scenario import make_cloud, make_gaussian
 def test_two_points_give_the_half_distance_in_every_ball_form():
     pts = np.array([[0.0, 0.0], [6.0, 8.0]])
     for form, expected in (("ball_soc", 5.0), ("ball_psd", 5.0), ("cube", 4.0), ("diamond", 7.0)):
-        assert A.solve_form(form, pts).result.value == pytest.approx(expected, abs=1e-6), form
+        assert A.solve_form(form, pts).result.value == pytest.approx(expected, abs=1e-5), form       # die Raute endet je nach CPU bei Lücke 1e-9 oder 1,4e-6
 
 
 def test_single_point_gives_radius_zero_up_to_the_gap():

@@ -102,7 +102,7 @@ def test_rotation_ratio_by_angle_and_never_worse():
 
 
 def test_only_the_diamond_ever_stops_at_the_rounding_limit():
-    """README: in 240 Läufen (40 Wolken mit n = 8 bis 13 und d = 2 bis 4, sechs Formen) endet die Raute neunmal vor der Lücke 1e-9 an der Rechengenauigkeit (bewiesene Lücke dann höchstens 1,5e-7), alle anderen Läufe erreichen sie."""
+    """README: in 240 Läufen (40 Wolken mit n = 8 bis 13 und d = 2 bis 4, sechs Formen) endet die Raute höchstens 14-mal (auf dem Entwicklungsrechner neunmal, auf GitHub-Runnern auch dreimal) vor der Lücke 1e-9 an der Rechengenauigkeit (bewiesene Lücke dann höchstens 1,5e-7), alle anderen Läufe erreichen sie."""
     stopped, worst = [], 0.0
     for seed in range(40):
         d, n = 2 + seed % 3, 8 + seed % 6
@@ -114,5 +114,5 @@ def test_only_the_diamond_ever_stops_at_the_rounding_limit():
             if not r.result.converged:
                 stopped.append(f)
                 worst = max(worst, r.result.gap_bound)
-    assert set(stopped) <= {"diamond"} and 5 <= len(stopped) <= 14
+    assert set(stopped) <= {"diamond"} and len(stopped) <= 14             # wie viele es sind, hängt von der CPU ab (Windows-Rechner: 9, GitHub-Runner: 3 und mehr)
     assert worst < 2e-7
