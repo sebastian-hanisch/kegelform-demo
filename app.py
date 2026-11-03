@@ -84,7 +84,7 @@ with st.container(key="kopf"):
 st.markdown(
     """
 **Ein Kegelprogramm hat nur drei Zutaten:** `min cᵀx` unter der Bedingung, dass `s = b − A x` in einem **Kegel** liegt. Der Kegel ist ein Produkt aus **Orthant** (LP), **Lorentz-Kegel** (SOCP) und **PSD-Kegel** (SDP).
-Die Demo schreibt **dieselbe Aufgabe in sechs Formen** (Würfel, Raute, Kugel, Kugel als SDP, zwei Ellipsen) und löst sie mit einem Löser: Die Form entscheidet über Größe und Aufwand, und **jeder Kegel kann etwas, das der vorige nicht kann**.
+Die Demo schreibt **dieselbe Aufgabe in sechs Formen** (Würfel, Raute, Kugel, Kugel als SDP, zwei Ellipsen) und löst sie mit einem Löser: Die Form entscheidet über Größe und Aufwand, und **im Allgemeinen kann jeder Kegel etwas, das der vorige nicht kann** (für PSD gegenüber Lorentz zeigt die Demo das in der Ebene nicht: dort genügen Lorentz-Kegel der Größe 3).
 Stück 2 der Reihe „Konvexe und konische Optimierung“, nach der kleinsten Kugel mit Zertifikat.
 
 Weiter unten: **vier Experimente** (**🔬**), ein **🧰 Baukasten**, ein **🔍 Datenblick**, **🚧 Wo die Annahmen enden** und der Expander **📐 Mathematische Formulierung**.
@@ -96,7 +96,7 @@ with st.expander("So funktioniert die Kegelform", expanded=True):
         """
 1. **Die Aufgabe:** Eine Punktwolke; gesucht ist die kleinste Form, die alle Punkte enthält (Würfel, Raute, Kugel oder Ellipse um den Ursprung).
 2. **Die Umformung:** Jede Bedingung wird zu einer Zeile `s = b − A x` in einem Kegel. Eine Norm `‖v‖ ≤ R` wird zu `(R; v)` im Lorentz-Kegel, eine Matrixbedingung zu einem PSD-Kegel. Im Baukasten unten steht, wie.
-3. **Der Löser:** Eine Barrierenmethode hält `s` im Inneren der Kegel und zieht den Strafterm schrittweise ab. Zu jedem Punkt gibt sie eine **bewiesene Lücke** `ν/t` zum Optimum, wie das Zertifikat aus Stück 1.
+3. **Der Löser:** Eine Barrierenmethode hält `s` im Inneren der Kegel und zieht den Strafterm schrittweise ab. Zu jedem zentrierten Punkt gibt sie eine **bewiesene Lücke** `ν/t` zum Optimum (bis auf Rundung bei sehr großem `t`), wie das Zertifikat aus Stück 1.
 4. **Die Probe:** Das Ergebnis wird zurück in die Ausgangsaufgabe übersetzt und dort geprüft (Normen ≤ R, `xᵀPx ≤ 1`), nicht nur im Kegelprogramm.
         """
     )
@@ -139,7 +139,7 @@ m3.metric("Zeilen von A", row["rows"], help="Zahl der Zeilen von A: die Komponen
 m4.metric("Newton-Schritte", row["newton"], help="In dieser Implementierung (Barrierenmethode, Zielgenauigkeit 1e-9).")
 m5.metric("Bewiesene Lücke", sci(row["gap"]), help="Das Optimum liegt höchstens so weit unter dem gefundenen Wert (Barrierenparameter geteilt durch t).")
 st.plotly_chart(build_shape(a.cloud.points, form, sel.shape), width="stretch", key="main_chart")
-st.caption(f"Kegel: {row['cones']}. Alle Formen sind um den Mittelwert der Wolke zentriert; bei den Ellipsen liegt der Mittelpunkt fest im Ursprung.")
+st.caption(f"Kegel: {row['cones']}. Die Wolke ist um ihren Mittelwert verschoben; Würfel, Raute und Kugel haben einen frei gewählten Mittelpunkt, die Ellipsen liegen fest im Ursprung (dem Mittelwert).")
 
 if st.button("📄 PDF der aktuellen Wolke erstellen", key="pdf_make"):
     st.session_state["pdf_made"] = (settings, build_pdf(a))

@@ -188,7 +188,7 @@ def verdict_lp(rows: list[dict]) -> tuple[str, str]:
     for r in rows:
         parts.append(f"d = {r['d']}: " + (f"{r['first']} Richtungen" if r["first"] else f"mehr als {r['ks'][-1]} Richtungen (Fehler {pct(r['errors'][-1])} bei {r['ks'][-1]})"))
     return "warning", ("Damit die LP-Nachbildung der Kugel höchstens " + pct(C.LP_TARGET) + " beim Radius danebenliegt, braucht jeder Punkt " + "; ".join(parts) +
-                       ". Ein einziger Lorentz-Kegel je Punkt ersetzt das exakt. Ab d = 3 sind die Richtungen zufällig gezogen (eine bessere Verteilung braucht weniger, wächst aber ähnlich).")
+                       ". Ein einziger Lorentz-Kegel je Punkt ersetzt das exakt. Ab d = 3 sind die Richtungen zufällig gezogen (eine bessere Verteilung braucht vermutlich weniger und wächst vermutlich ähnlich; nicht gemessen).")
 
 
 def verdict_psd(rows: list[dict]) -> tuple[str, str]:

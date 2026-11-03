@@ -35,6 +35,6 @@ PRESET_HELP = {
     "Die Raute (LP)": "Dieselbe Wolke mit der l1-Kugel: ein reines LP, aber mit Hilfsvariablen für die Beträge.",
     "Dieselbe Kugel als SDP": "Gleicher Radius wie die Kugel im Lorentz-Kegel, aber jede Bedingung als 3 x 3-Matrix im PSD-Kegel: mehr Zeilen, gleiche Lösung.",
     "Achsenparallel verfehlt die Drehung": "Die Ellipse muss mit den Koordinatenachsen ausgerichtet bleiben und wird für die um 45 Grad gedrehte Wolke deutlich größer.",
-    "Allgemeine Ellipse findet sie": "Die allgemeine Ellipse (ein PSD-Kegel) dreht sich mit der Wolke und braucht nur etwa die halbe Summe der quadrierten Halbachsen.",
+    "Allgemeine Ellipse findet sie": "Die allgemeine Ellipse (ein PSD-Kegel) dreht sich mit der Wolke und braucht etwa 0,5 bis 0,6 der Summe der quadrierten Halbachsen der achsenparallelen (je nach Wolke).",
 }
 assert set(PRESETS) == set(PRESET_HELP) and all(p["form"] in A.FORMS for p in PRESETS.values())
